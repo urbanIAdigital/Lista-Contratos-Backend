@@ -190,6 +190,13 @@ app.get(
     const queryInteradministrativo = `
     SELECT 
       p."CONTRATO_INTERADMINISTRATIVO" AS "contrato_interadministrativo",
+      p."NOMBRE_INTERADMINISTRATIVO" AS "nombre_interadministrativo",
+      p."CLIENTE" AS "cliente",
+      p."CENTRO_DE_COSTOS" AS "centro_de_costos",
+      p."VALOR_HONORARIOS" AS "valor_honorarios",
+      p."VALOR" AS "valor",
+      p."PORCENTAJE_HONORARIOS" AS "porcentaje_honorarios",
+      p."PLAZO" AS "plazo",
       p."OBJETO" AS "objeto_contrato"
     FROM "contratosinteradministrativos" p
     WHERE p."CONTRATO_INTERADMINISTRATIVO" = $1;
@@ -197,8 +204,6 @@ app.get(
 
     const queryContratosDerivados = `
     SELECT 
-      p."CONTRATO_INTERADMINISTRATIVO" AS "contrato_interadministrativo",
-      p."OBJETO" AS "objeto_contrato",
       d."CODIGO" AS "codigo_derivado",
       d."CLIENTE" AS "cliente",
       d."SUPERVISOR" AS "supervisor",
@@ -212,42 +217,41 @@ app.get(
 
     const queryRubros = `
     SELECT 
-        "RUBRO",
-        "NOMBRE_RUBRO",
-        "CONTRATO_INTERADMINISTRATIVO",
-        ARRAY_AGG(DISTINCT "SRS_ANOP") AS "ANOS_UNICOS",
-        SUM("APROPIACION_INICIAL") AS "TOTAL_APROPIACION_INICIAL",
-        SUM("APROPIACION_DEFINITIVA") AS "TOTAL_APROPIACION_DEFINITIVA",
-        JSON_AGG(
-            JSON_BUILD_OBJECT(
-                'APROPIACION_INICIAL', "APROPIACION_INICIAL",
-                'APROPIACION_DEFINITIVA', "APROPIACION_DEFINITIVA",
-                'CDP', "CDP",
-                'DISPONIBLE', "DISPONIBLE",
-                'COMPROMETIDO', "COMPROMETIDO",
-                'PAGOS', "PAGOS",
-                'POR_COMPROMETER', "POR_COMPROMETER",
-                'POR_PAGAR', "POR_PAGAR",
-                'ANO', "SRS_ANOP"
-            )
-        ) AS "DETALLES"
+    "RUBRO" AS "rubro",
+    "RUBRO_ID" AS "rubroId",
+    "NOMBRE_RUBRO" AS "nombre_rubro",
+    "CONTRATO_INTERADMINISTRATIVO" AS "contrato_interadministrativo",
+    ARRAY_AGG(DISTINCT "SRS_ANOP") AS "anos_unicos",
+    SUM("APROPIACION_INICIAL") AS "total_apropiacion_inicial",
+    SUM("APROPIACION_DEFINITIVA") AS "total_apropiacion_definitiva",
+    JSON_AGG(
+        JSON_BUILD_OBJECT(
+            'apropiacion_inicial', "APROPIACION_INICIAL",
+            'apropiacion_definitiva', "APROPIACION_DEFINITIVA",
+            'cdp', "CDP",
+            'disponible', "DISPONIBLE",
+            'comprometido', "COMPROMETIDO",
+            'pagos', "PAGOS",
+            'por_comprometer', "POR_COMPROMETER",
+            'por_pagar', "POR_PAGAR",
+            'ano', "SRS_ANOP"
+        )
+    ) AS "detalles"
     FROM interRubros2
     WHERE "CONTRATO_INTERADMINISTRATIVO" = $1
-    GROUP BY "RUBRO", "NOMBRE_RUBRO", "CONTRATO_INTERADMINISTRATIVO";
+    GROUP BY "RUBRO", "NOMBRE_RUBRO", "CONTRATO_INTERADMINISTRATIVO", "RUBRO_ID";
   `;
 
     try {
       // Ejecutar las consultas en paralelo
-      const [interResult, derivadosResult, rubrosResult] = await Promise.all(
-        [
-          pool.query(queryInteradministrativo, [contratoId]),
-          pool.query(queryContratosDerivados, [contratoId]),
-          pool.query(queryRubros, [contratoId]),
-        ]
-      );
+      const [interResult, derivadosResult, rubrosResult] = await Promise.all([
+        pool.query(queryInteradministrativo, [contratoId]),
+        pool.query(queryContratosDerivados, [contratoId]),
+        pool.query(queryRubros, [contratoId]),
+      ]);
 
       // Estructurar la respuesta
-      const contratoDetalles = interResult.rows[0]|| null;
+      const contratoDetalles = interResult.rows[0] || null;
       const contratosDerivados = derivadosResult.rows || [];
       const rubros = rubrosResult.rows || [];
 
