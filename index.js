@@ -1,6 +1,8 @@
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
+const { getToken } = require("./functions/getTokenAcc");
+const axios = require("axios");
 
 const app = express();
 const port = 3000;
@@ -36,6 +38,60 @@ app.get("/api/contratos_interadministrativos", (req, res) => {
       res
         .status(500)
         .json({ error: "Error al obtener los contratos interadministrativos" });
+    });
+});
+app.get("/api/projectos_acc", (req, res) => {
+  const accessToken = async () => {
+    return await getToken();
+  };
+  const getHubId = async () => {
+    const token = await accessToken();
+    console.log(token);
+    
+    const url = `https://developer.api.autodesk.com/authentication/v2/token/project/v1/hubs`;
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    console.log(url, headers);
+    
+    try {
+      const { data } = await axios.get(url, {
+        headers,
+      });
+      if (data.data.length === 0) return null;
+      console.log(data.data);
+      
+      return data.data[0].id;
+    } catch (error) {
+      console.error(error.status);
+    }
+  };
+
+  const getProjectList = async () => {
+    const hubId = await getHubId();
+    const token = await accessToken();
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    const url = `https://developer.api.autodesk.com/authentication/v2/token/project/v1/hubs/${hubId}/projects`;
+    console.log(url);
+    
+    const { data } = await axios.get(url, {
+      headers,
+    });
+    return data.data;
+  };
+  getProjectList()
+    .then((resp) => {
+      console.log(resp);
+
+      res.json(resp);
+    })
+    .catch((err) => {
+      console.error(err.status);
+      res.status(500).json({ error: "Error al obtener projects" });
     });
 });
 
@@ -122,6 +178,23 @@ app.get(
       });
   }
 );
+app.get("/api/contratos_interadministrativos/:id/pmo", (req, res) => {
+  const contratoId = decodeURIComponent(req.params.id);
+  const query = `
+    SELECT p.*
+    FROM "pmo_ci" p
+    WHERE p."CONTRATO_INTERADMINISTRATIVO" = $1
+  `;
+  pool
+    .query(query, [contratoId])
+    .then((result) => res.json(result.rows))
+    .catch((err) => {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: "Error al obtener los contratos derivados" });
+    });
+});
 app.get("/api/contratos_interadministrativos/:id/rubros", (req, res) => {
   const contratoId = decodeURIComponent(req.params.id);
   const query = `
